@@ -85,6 +85,11 @@ Russian GUI. Configurable Enter suffix. Single-shot per tap. Auto-start via inst
    - `eframe::run_native` with stub `App`.
 5. Verify: compiles, window opens, config roundtrip works.
 
+**Expected Result:**
+- `cargo test` passes (`config_roundtrip`, `translate_known_key`, `translate_fallback`).
+- `cargo run` opens a window titled `Ожидание карты...`.
+- No English text visible in UI. All labels Russian.
+
 **Config schema v1:**
 ```json
 {
@@ -116,6 +121,12 @@ Russian GUI. Configurable Enter suffix. Single-shot per tap. Auto-start via inst
    - Status label shows "Ожидание карты..." or "Карта обнаружена".
 5. Verify: ACR1552U appears in dropdown. Card insert/removal updates status.
 
+**Expected Result:**
+- With ACR1552U plugged in, dropdown lists `ACS ACR1552U` (or similar).
+- Tap card on reader → status label turns green: `Карта обнаружена`.
+- Remove card → status returns to `Ожидание карты...`.
+- No crash if reader unplugged while app running.
+
 ---
 
 ### Phase 3 — Tag Read (Type 2 & Type 4)
@@ -138,6 +149,11 @@ Russian GUI. Configurable Enter suffix. Single-shot per tap. Auto-start via inst
 3. `src/nfc/mod.rs`:
    - On `CardPresent`: call tag detection → read bytes → send `NfcEvent::Data(Vec<u8>)`.
 4. Verify: with real tag, raw bytes appear in logs. Use `tracing::debug!("raw={:02x?}", bytes)`.
+
+**Expected Result:**
+- Console / log viewer shows hex dump after card tap, e.g. `[info] raw=[03, 12, D1, 01, ...]`.
+- Tag type correctly identified as Type 2 or Type 4 in logs.
+- No panic on unsupported tag type. Error gracefully logged.
 
 **Decision:** Since tag write format unknown, we read enough memory to capture NDEF message or raw payload. We attempt NDEF parse next. If that fails, we fall back to raw UTF-8.
 
@@ -163,6 +179,12 @@ Russian GUI. Configurable Enter suffix. Single-shot per tap. Auto-start via inst
    - Display read text in status label. `Прочитано: <текст>`.
 5. Verify: tap tag → text appears in UI. Test with phone HCE and physical tags.
 
+**Expected Result:**
+- Status label shows `Прочитано: <текст карты>`.
+- If card contains NDEF Text → exact text displayed.
+- If card contains raw UTF-8 → text displayed without nulls.
+- If unreadable → status shows `Ошибка: <причина>`.
+
 ---
 
 ### Phase 5 — Single-Shot Guard
@@ -178,6 +200,11 @@ Russian GUI. Configurable Enter suffix. Single-shot per tap. Auto-start via inst
    - Before sending text: check `cooldown_guard.allow(&uid)`.
    - If denied: log `tracing::debug!("duplicate tap ignored")`, do not send.
 3. Verify: hold card → types once. Remove and re-tap within 2s → blocked. Re-tap after 2s → allowed.
+
+**Expected Result:**
+- Hold card on reader 3s → only one `Прочитано: ...` entry in log.
+- Quick re-tap same card within 2s → no new log entry. `duplicate tap ignored` in debug log.
+- Wait 3s, re-tap same card → new read accepted.
 
 ---
 
@@ -196,6 +223,12 @@ Russian GUI. Configurable Enter suffix. Single-shot per tap. Auto-start via inst
    - In `update()`, on `NfcEvent::Text(text)`: spawn `std::thread::spawn_blocking` calling `wedge::type_text(&text, cfg.append_enter)`.
    - Log result. Show "Текст введён" in status.
 4. Verify: open Notepad, tap tag → text appears. Check append Enter.
+
+**Expected Result:**
+- Open TextEdit (macOS) or Notepad (Windows). Tap tag → text typed into document.
+- With `Добавить Enter` enabled → cursor moves to next line after text.
+- With checkbox unchecked → text appears, no newline.
+- UI remains responsive during typing. No freeze.
 
 **Note:** `enigo` uses `SendInput` on Windows. Must run in blocking thread to not stall UI. Ensure app has foreground focus or Windows may block input. Usually `SendInput` works regardless.
 
@@ -225,6 +258,11 @@ Russian GUI. Configurable Enter suffix. Single-shot per tap. Auto-start via inst
    - Complete `ru.json` with all UI keys.
 3. Verify: all controls functional. Config persists across restarts.
 
+**Expected Result:**
+- Select reader, click `Установить по умолчанию`, close app, reopen → dropdown pre-selects same reader.
+- Toggle `Добавить Enter`, close app, reopen → checkbox state restored.
+- No English labels anywhere. All buttons, checkboxes, status text in Russian.
+
 ---
 
 ### Phase 8 — System Tray
@@ -243,6 +281,12 @@ Russian GUI. Configurable Enter suffix. Single-shot per tap. Auto-start via inst
    - `SHOULD_EXIT` flag for tray Exit menu. If true: allow close.
 4. Verify: click X → window hides, tray icon remains. Double-click tray → window shows. Exit menu → process terminates.
 
+**Expected Result:**
+- Click window close (X) → window disappears, but `nfc-wedge` still visible in system tray / menu bar.
+- Click tray icon → context menu with `Показать` and `Выход`.
+- Click `Показать` → window reappears at last position.
+- Click `Выход` → process exits fully. Tray icon disappears.
+
 ---
 
 ### Phase 9 — Auto-Start
@@ -259,6 +303,12 @@ Russian GUI. Configurable Enter suffix. Single-shot per tap. Auto-start via inst
    - Wire checkbox to `auto_start::enable()` / `disable()`.
    - On startup, read state and set checkbox.
 4. Verify: enable checkbox, restart Windows (or check registry key). App launches.
+
+**Expected Result:**
+- Check `Запускать при входе в Windows` → config saves, registry (Win) or LaunchAgent (macOS) created.
+- Uncheck → entry removed.
+- On Windows: `regedit` shows `HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\nfc-wedge` pointing to exe path.
+- On macOS: `~/Library/LaunchAgents/nfc-wedge.plist` exists when enabled.
 
 **Decision:** MSI install path (Phase 10) gives stable `exe` path. If user moves portable exe, registry path breaks. We'll use MSI.
 
@@ -279,6 +329,12 @@ Russian GUI. Configurable Enter suffix. Single-shot per tap. Auto-start via inst
 3. Build: `cargo wix --nocapture`.
 4. Output: `target/wix/nfc-wedge-0.1.0.msi`.
 5. Verify: install on clean Windows VM. App appears in Start Menu. Tray works. Uninstall removes files.
+
+**Expected Result:**
+- Double-click `.msi` → wizard completes without errors.
+- App appears in Start Menu as `nfc-wedge`.
+- App launches from Start Menu, tray icon appears, all Phases 1–9 features functional.
+- Uninstall from `Add or Remove Programs` → exe removed, Start Menu shortcut removed. Config in `%APPDATA%` optionally preserved.
 
 ---
 
@@ -390,6 +446,13 @@ Implement via `egui::TopBottomPanel::top` holding tab buttons + active tab index
 4. Verify: tap NFC tag → text appears in TextEdit (or any focused macOS app).
 5. Verify: tray icon, hide/show, enable/disable, log viewer.
 6. Final Windows binary built on Windows CI or machine with `cargo wix`.
+
+**Expected Result (macOS Validation):**
+- `cargo run --release` on macBook compiles without errors.
+- ACR1552U detected after installing ACS macOS driver.
+- Full tap-to-type cycle works in TextEdit.
+- Tray icon, logs, enable/disable all functional.
+- `cargo wix` skipped on macOS (Windows-only Phase 10).
 
 ---
 
