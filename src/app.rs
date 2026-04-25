@@ -61,6 +61,12 @@ impl App {
                     self.status_kind = StatusKind::Waiting;
                     self.status_text = self.i18n.t("waiting_card");
                 }
+                nfc::NfcEvent::Data(bytes) => {
+                    self.card_present = true;
+                    self.status_kind = StatusKind::Detected;
+                    let hex: String = bytes.iter().map(|b| format!("{:02x}", b)).collect();
+                    self.status_text = format!("{}: {} bytes = [{}]", self.i18n.t("read_text"), bytes.len(), hex);
+                }
                 nfc::NfcEvent::Error(msg) => {
                     self.status_kind = StatusKind::Error;
                     self.status_text = format!("{}: {}", self.i18n.t("error"), msg);

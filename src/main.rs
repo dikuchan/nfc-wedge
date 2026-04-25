@@ -11,7 +11,7 @@ fn main() -> anyhow::Result<()> {
         .init();
 
     let config = config::Config::load()?;
-    let i18n = i18n::I18n::new(&config.language);
+    let i18n = i18n::I18n::new(&config.language)?;
 
     let (nfc_handle, nfc_cmd, nfc_evt) = nfc::start()?;
 

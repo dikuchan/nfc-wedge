@@ -3,7 +3,9 @@ use crossbeam_channel::{Receiver, Sender};
 use std::thread;
 use std::time::Duration;
 
+pub mod apdu;
 pub mod pcsc;
+pub mod tag;
 
 /// Commands sent from UI to NFC thread.
 pub enum Command {
@@ -18,6 +20,7 @@ pub enum NfcEvent {
     Readers(Vec<String>),
     CardPresent,
     CardRemoved,
+    Data(Vec<u8>),
     Error(String),
 }
 
@@ -31,6 +34,54 @@ pub fn start() -> Result<(thread::JoinHandle<()>, Sender<Command>, Receiver<NfcE
     Ok((handle, cmd_tx, evt_rx))
 }
 
+/// Retry connect up to 5 times with 200ms delay.
+/// Returns Ok on successful read, Err only after retries exhausted.
+fn try_connect_and_read(
+    ctx: &::pcsc::Context,
+    reader: &str,
+    evt_tx: &Sender<NfcEvent>,
+) -> anyhow::Result<()> {
+    for attempt in 1..=5 {
+        match pcsc::connect_card(ctx, reader) {
+            Ok(card) => {
+                tracing::info!("connected to card on {reader}, attempt {attempt}");
+                match tag::read_tag(&card) {
+                    Ok(data) => {
+                        tracing::info!("read {} bytes from card", data.len());
+                        let _ = evt_tx.send(NfcEvent::Data(data));
+                    }
+                    Err(e) => {
+                        tracing::warn!("read failed on attempt {attempt}: {e}");
+                        if attempt == 5 {
+                            return Err(e);
+                        }
+                    }
+                }
+                if let Err(e) = pcsc::disconnect_card(card) {
+                    tracing::warn!("disconnect error: {e}");
+                }
+                return Ok(());
+            }
+            Err(::pcsc::Error::NoSmartcard) => {
+                tracing::info!(
+                    "card not ready on attempt {}/5, retrying in 200ms",
+                    attempt
+                );
+                if attempt < 5 {
+                    thread::sleep(Duration::from_millis(200));
+                }
+            }
+            Err(e) => {
+                tracing::warn!("connect error on attempt {attempt}: {e}");
+                return Err(anyhow::anyhow!("{e}"));
+            }
+        }
+    }
+    Err(anyhow::anyhow!(
+        "card not ready after 5 attempts (approx 1s)"
+    ))
+}
+
 fn run(cmd_rx: Receiver<Command>, evt_tx: Sender<NfcEvent>) {
     let ctx = match pcsc::establish() {
         Ok(c) => c,
@@ -42,6 +93,7 @@ fn run(cmd_rx: Receiver<Command>, evt_tx: Sender<NfcEvent>) {
 
     let mut selected_reader: Option<String> = None;
     let mut was_present = false;
+    let mut card_read = false;
 
     loop {
         // Drain commands without blocking
@@ -51,6 +103,7 @@ fn run(cmd_rx: Receiver<Command>, evt_tx: Sender<NfcEvent>) {
                     tracing::info!("reader selected: {name}");
                     selected_reader = Some(name);
                     was_present = false;
+                    card_read = false;
                 }
                 Command::Pause => {
                     tracing::info!("polling paused");
@@ -73,6 +126,15 @@ fn run(cmd_rx: Receiver<Command>, evt_tx: Sender<NfcEvent>) {
                         tracing::info!("card present on {reader}");
                         let _ = evt_tx.send(NfcEvent::CardPresent);
                         was_present = true;
+                        // Card needs time to power up and negotiate protocol.
+                        thread::sleep(Duration::from_millis(300));
+                    }
+                    if !card_read {
+                        if let Err(e) = try_connect_and_read(&ctx, reader, &evt_tx) {
+                            tracing::warn!("failed to read card: {e}");
+                            let _ = evt_tx.send(NfcEvent::Error(format!("{e}")));
+                        }
+                        card_read = true;
                     }
                 }
                 Ok(false) => {
@@ -80,6 +142,7 @@ fn run(cmd_rx: Receiver<Command>, evt_tx: Sender<NfcEvent>) {
                         tracing::info!("card removed from {reader}");
                         let _ = evt_tx.send(NfcEvent::CardRemoved);
                         was_present = false;
+                        card_read = false;
                     }
                 }
                 Err(::pcsc::Error::Timeout) => {}
@@ -88,6 +151,7 @@ fn run(cmd_rx: Receiver<Command>, evt_tx: Sender<NfcEvent>) {
                     let _ = evt_tx.send(NfcEvent::Error(format!("{reader}: {e}")));
                     selected_reader = None;
                     was_present = false;
+                    card_read = false;
                 }
             }
         } else {
