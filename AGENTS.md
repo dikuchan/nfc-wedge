@@ -34,7 +34,7 @@
 
 ## PRs
 
-* Ask for commit approval after each change. If agreed, commit.
+* Must ask for commit approval after each change. Commit only after an explicit *OK*.
 * Use Conventional Commits format.
 * Commit title should be a continuation of "When merged, this commit will {title}".
 * PR description must include *Why* the changes were made, not *What* the code does.
