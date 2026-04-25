@@ -1,0 +1,22 @@
+{
+  "reader": "Считыватель",
+  "refresh": "Обновить",
+  "set_default": "Установить по умолчанию",
+  "append_enter": "Добавить Enter",
+  "auto_start": "Запускать при входе в Windows",
+  "waiting_card": "Ожидание карты...",
+  "card_detected": "Карта обнаружена",
+  "error": "Ошибка",
+  "read_text": "Прочитано",
+  "text_entered": "Текст введён",
+  "show": "Показать",
+  "exit": "Выход",
+  "logs": "Журнал",
+  "settings": "Настройки",
+  "enable_disable": "Вкл/Выкл",
+  "enable_polling": "Включить считывание",
+  "disable_polling": "Остановить считывание",
+  "status_running": "Статус: Работает",
+  "status_stopped": "Статус: Остановлено",
+  "clear": "Очистить"
+}
