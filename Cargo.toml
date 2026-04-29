@@ -2,6 +2,9 @@
 name = "nfc-wedge"
 version = "0.1.0"
 edition = "2024"
+authors = ["dikuchan"]
+license = "MIT"
+description = "NFC NDEF text reader with keyboard wedge functionality"
 
 [dependencies]
 eframe = "0.31"
@@ -21,3 +24,9 @@ enigo = "0.6"
 tray-icon = "0.23"
 image = "0.25"
 auto-launch = "0.5"
+
+[package.metadata.wix]
+upgrade-guid = "DA1EAFE8-E654-4E82-AEB7-39B8A2017A42"
+path-guid = "FCA654CD-DB23-489E-84F5-FC8B259573ED"
+license = false
+eula = false
