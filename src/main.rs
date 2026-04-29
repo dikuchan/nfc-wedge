@@ -4,6 +4,7 @@ mod event_bus;
 mod i18n;
 mod nfc;
 mod single_shot;
+mod tray;
 mod wedge;
 
 use tracing::Level;
@@ -12,6 +13,7 @@ fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_max_level(Level::INFO)
         .init();
+
 
     let config = config::Config::load()?;
     let i18n = i18n::I18n::new(&config.language)?;

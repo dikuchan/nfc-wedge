@@ -5,6 +5,7 @@ use crate::config::Config;
 use crate::event_bus::EventBus;
 use crate::i18n::I18n;
 use crate::nfc;
+use crate::tray::TrayManager;
 
 pub struct App {
     config: Config,
@@ -17,6 +18,8 @@ pub struct App {
     status_kind: StatusKind,
     active_tab: Tab,
     polling_enabled: bool,
+    tray: Option<TrayManager>,
+    should_exit: bool,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -48,6 +51,15 @@ impl App {
             let _ = nfc_cmd.send(nfc::Command::SetReader(reader.clone()));
         }
         
+        // Create tray icon
+        let tray = match TrayManager::new(&i18n.t("show"), &i18n.t("exit")) {
+            Ok(tray) => Some(tray),
+            Err(e) => {
+                tracing::error!("failed to create tray icon: {e}");
+                None
+            }
+        };
+        
         Self {
             config,
             i18n,
@@ -59,6 +71,8 @@ impl App {
             status_kind: StatusKind::Waiting,
             active_tab: Tab::Settings,
             polling_enabled: true,
+            tray,
+            should_exit: false,
         }
     }
 
@@ -105,11 +119,31 @@ impl App {
             tracing::warn!("failed to send NFC command: {e}");
         }
     }
+    
+    fn poll_tray(&mut self, ctx: &egui::Context) {
+        if let Some(ref tray) = self.tray {
+            let (show, exit) = tray.poll_events();
+            
+            if show {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+                ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+            }
+            
+            if exit {
+                self.should_exit = true;
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+        }
+    }
 }
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Keep update loop running even when window is hidden (for tray polling)
+        ctx.request_repaint_after(std::time::Duration::from_millis(100));
+        
         self.poll_nfc();
+        self.poll_tray(ctx);
 
         // Top panel with tabs
         egui::TopBottomPanel::top("tabs").show(ctx, |ui| {
@@ -129,8 +163,14 @@ impl eframe::App for App {
             }
         });
 
+        // Handle close button: hide to tray instead of exit
         if ctx.input(|i| i.viewport().close_requested()) {
-            self.send_command(nfc::Command::Shutdown);
+            if self.should_exit {
+                self.send_command(nfc::Command::Shutdown);
+            } else {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+                ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            }
         }
     }
 }
