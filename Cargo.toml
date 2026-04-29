@@ -15,3 +15,4 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 pcsc = "2.8"
 crossbeam-channel = "0.5"
+ndef-rs = "0.2.3"

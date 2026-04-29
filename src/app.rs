@@ -1,7 +1,8 @@
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam_channel::Sender;
 use eframe::egui;
 
 use crate::config::Config;
+use crate::event_bus::EventBus;
 use crate::i18n::I18n;
 use crate::nfc;
 
@@ -9,12 +10,11 @@ pub struct App {
     config: Config,
     i18n: I18n,
     nfc_cmd: Sender<nfc::Command>,
-    nfc_evt: Receiver<nfc::NfcEvent>,
+    event_bus: EventBus,
     readers: Vec<String>,
     selected_reader: Option<String>,
     status_text: String,
     status_kind: StatusKind,
-    card_present: bool,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -29,43 +29,38 @@ impl App {
         config: Config,
         i18n: I18n,
         nfc_cmd: Sender<nfc::Command>,
-        nfc_evt: Receiver<nfc::NfcEvent>,
+        event_bus: EventBus,
     ) -> Self {
         let status_text = i18n.t("waiting_card");
         Self {
             config,
             i18n,
             nfc_cmd,
-            nfc_evt,
+            event_bus,
             readers: Vec::new(),
             selected_reader: None,
             status_text,
             status_kind: StatusKind::Waiting,
-            card_present: false,
         }
     }
 
     fn poll_nfc(&mut self) {
-        while let Ok(evt) = self.nfc_evt.try_recv() {
+        for evt in self.event_bus.poll_nfc_events() {
             match evt {
                 nfc::NfcEvent::Readers(list) => {
                     self.readers = list;
                 }
                 nfc::NfcEvent::CardPresent => {
-                    self.card_present = true;
                     self.status_kind = StatusKind::Detected;
                     self.status_text = self.i18n.t("card_detected");
                 }
                 nfc::NfcEvent::CardRemoved => {
-                    self.card_present = false;
                     self.status_kind = StatusKind::Waiting;
                     self.status_text = self.i18n.t("waiting_card");
                 }
-                nfc::NfcEvent::Data(bytes) => {
-                    self.card_present = true;
+                nfc::NfcEvent::Text(text) => {
                     self.status_kind = StatusKind::Detected;
-                    let hex: String = bytes.iter().map(|b| format!("{:02x}", b)).collect();
-                    self.status_text = format!("{}: {} bytes = [{}]", self.i18n.t("read_text"), bytes.len(), hex);
+                    self.status_text = format!("{}: {}", self.i18n.t("read_text"), text);
                 }
                 nfc::NfcEvent::Error(msg) => {
                     self.status_kind = StatusKind::Error;
@@ -113,7 +108,6 @@ impl eframe::App for App {
                     });
 
                 if ui.button(self.i18n.t("refresh")).clicked() {
-                    // Reader list auto-refreshes from thread; manual refresh just triggers repaint.
                     ctx.request_repaint();
                 }
             });
@@ -129,13 +123,13 @@ impl eframe::App for App {
 
             ui.separator();
 
-            let (color, label) = match self.status_kind {
-                StatusKind::Waiting => (ui.visuals().weak_text_color(), self.status_text.clone()),
-                StatusKind::Detected => (egui::Color32::GREEN, self.status_text.clone()),
-                StatusKind::Error => (egui::Color32::RED, self.status_text.clone()),
+            let color = match self.status_kind {
+                StatusKind::Waiting => ui.visuals().weak_text_color(),
+                StatusKind::Detected => egui::Color32::GREEN,
+                StatusKind::Error => egui::Color32::RED,
             };
 
-            ui.colored_label(color, label);
+            ui.colored_label(color, &self.status_text);
         });
 
         if ctx.input(|i| i.viewport().close_requested()) {

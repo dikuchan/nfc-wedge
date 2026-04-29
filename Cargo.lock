@@ -524,6 +524,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "byteorder"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
+
+[[package]]
 name = "byteorder-lite"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1890,6 +1896,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ndef-rs"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ddd0fc6250331cbd89cc68e267aa411e6dbf59994731f5f34f1c2d742ab8c98"
+dependencies = [
+ "anyhow",
+ "bitflags 2.11.1",
+ "byteorder",
+ "strum",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "ndk"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1937,6 +1956,7 @@ dependencies = [
  "directories",
  "eframe",
  "egui",
+ "ndef-rs",
  "pcsc",
  "serde",
  "serde_json",
