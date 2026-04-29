@@ -11,6 +11,12 @@ pub struct Config {
     pub default_reader: Option<String>,
     pub append_enter: bool,
     pub language: String,
+    #[serde(default = "default_cooldown_ms")]
+    pub cooldown_ms: u64,
+}
+
+fn default_cooldown_ms() -> u64 {
+    2000
 }
 
 impl Default for Config {
@@ -19,6 +25,7 @@ impl Default for Config {
             default_reader: None,
             append_enter: true,
             language: "ru".to_string(),
+            cooldown_ms: default_cooldown_ms(),
         }
     }
 }

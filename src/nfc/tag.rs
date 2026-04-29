@@ -6,6 +6,9 @@ use super::apdu;
 const MAX_TYPE2_PAGES: u8 = 231; // NTAG216 total pages
 const READ_SIZE: u8 = 16; // 4 pages per read
 
+/// Get Data APDU for retrieving card UID.
+const GET_UID_APDU: [u8; 5] = [0xFF, 0xCA, 0x00, 0x00, 0x00];
+
 /// Reads data from a Type 2 tag (NTAG216 and compatible).
 ///
 /// # Errors
@@ -86,4 +89,26 @@ fn parse_tlv(data: &[u8]) -> Result<(usize, &[u8]), &'static str> {
     }
 
     Ok((header_len + len, &data[header_len..header_len + len]))
+}
+
+/// Retrieves the card UID using PC/SC Get Data command.
+///
+/// # Errors
+///
+/// Returns error if the reader does not support UID retrieval or transmission fails.
+pub fn get_uid(card: &Card) -> Result<Vec<u8>> {
+    let mut recv = [0u8; 32];
+    let rsp = card.transmit(&GET_UID_APDU, &mut recv)
+        .map_err(|e| anyhow!("failed to get UID: {e}"))?;
+
+    if !apdu::is_success(rsp) {
+        return Err(anyhow!("get UID command returned error"));
+    }
+
+    let uid = apdu::payload(rsp).to_vec();
+    if uid.is_empty() {
+        return Err(anyhow!("UID is empty"));
+    }
+
+    Ok(uid)
 }

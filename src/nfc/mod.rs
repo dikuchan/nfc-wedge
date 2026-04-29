@@ -4,6 +4,7 @@ use std::thread;
 use std::time::Duration;
 
 use crate::event_bus::NfcEventSender;
+use crate::single_shot::CooldownGuard;
 
 pub mod apdu;
 pub mod ndef;
@@ -38,10 +39,10 @@ impl NfcEvent {
 }
 
 /// Spawn NFC worker thread. Returns (handle, command_sender).
-pub fn start(event_sender: NfcEventSender) -> Result<(thread::JoinHandle<()>, Sender<Command>)> {
+pub fn start(event_sender: NfcEventSender, cooldown_ms: u64) -> Result<(thread::JoinHandle<()>, Sender<Command>)> {
     let (cmd_tx, cmd_rx) = crossbeam_channel::bounded(16);
 
-    let handle = thread::spawn(move || run(cmd_rx, event_sender));
+    let handle = thread::spawn(move || run(cmd_rx, event_sender, cooldown_ms));
 
     Ok((handle, cmd_tx))
 }
@@ -50,11 +51,29 @@ fn try_connect_and_read(
     p_ctx: &::pcsc::Context,
     reader: &str,
     evt_tx: &NfcEventSender,
+    guard: &mut CooldownGuard,
 ) -> anyhow::Result<()> {
     for attempt in 1..=5 {
         match pcsc::connect_card(p_ctx, reader) {
             Ok(card) => {
                 tracing::info!("connected to card on {reader}, attempt {attempt}");
+                
+                // Get UID for deduplication
+                let uid = match tag::get_uid(&card) {
+                    Ok(uid) => uid,
+                    Err(e) => {
+                        tracing::warn!("failed to get UID: {e}, skipping cooldown check");
+                        vec![]
+                    }
+                };
+                
+                // Check cooldown guard
+                if !uid.is_empty() && !guard.should_process(&uid) {
+                    tracing::debug!("card read blocked by cooldown");
+                    let _ = pcsc::disconnect_card(card);
+                    return Ok(());
+                }
+                
                 match tag::read_tag(&card) {
                     Ok(data) => {
                         tracing::info!("read {} bytes from card", data.len());
@@ -86,7 +105,7 @@ fn try_connect_and_read(
     Err(anyhow::anyhow!("card not ready after retries"))
 }
 
-fn run(cmd_rx: Receiver<Command>, evt_tx: NfcEventSender) {
+fn run(cmd_rx: Receiver<Command>, evt_tx: NfcEventSender, cooldown_ms: u64) {
     let p_ctx = match pcsc::establish() {
         Ok(c) => c,
         Err(e) => {
@@ -95,6 +114,7 @@ fn run(cmd_rx: Receiver<Command>, evt_tx: NfcEventSender) {
         }
     };
 
+    let mut guard = CooldownGuard::new(Duration::from_millis(cooldown_ms));
     let mut selected_reader: Option<String> = None;
     let mut was_present = false;
     let mut card_read = false;
@@ -122,7 +142,7 @@ fn run(cmd_rx: Receiver<Command>, evt_tx: NfcEventSender) {
                         thread::sleep(Duration::from_millis(600));
                     }
                     if !card_read {
-                        if let Err(e) = try_connect_and_read(&p_ctx, reader, &evt_tx) {
+                        if let Err(e) = try_connect_and_read(&p_ctx, reader, &evt_tx, &mut guard) {
                             evt_tx.send(NfcEvent::Error(e.to_string()));
                         }
                         card_read = true;

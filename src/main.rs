@@ -3,6 +3,7 @@ mod config;
 mod event_bus;
 mod i18n;
 mod nfc;
+mod single_shot;
 
 use tracing::Level;
 
@@ -29,7 +30,7 @@ fn main() -> anyhow::Result<()> {
                 let ctx = cc.egui_ctx.clone();
                 move || ctx.request_repaint()
             });
-            let (_nfc_handle, nfc_cmd) = nfc::start(nfc_event_sender)
+            let (_nfc_handle, nfc_cmd) = nfc::start(nfc_event_sender, config.cooldown_ms)
                 .expect("Failed to start NFC thread");
 
             let app = app::App::new(config, i18n, nfc_cmd, event_bus);
