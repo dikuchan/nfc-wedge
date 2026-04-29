@@ -61,6 +61,18 @@ impl App {
                 nfc::NfcEvent::Text(text) => {
                     self.status_kind = StatusKind::Detected;
                     self.status_text = format!("{}: {}", self.i18n.t("read_text"), text);
+                    
+                    // Spawn blocking task to type text into active window
+                    let text_clone = text.clone();
+                    let delay = self.config.typing_delay_ms;
+                    let append_enter = self.config.append_enter;
+                    std::thread::spawn(move || {
+                        if let Err(e) = crate::wedge::type_text(&text_clone, delay, append_enter) {
+                            tracing::error!("keyboard wedge failed: {e}");
+                        } else {
+                            tracing::info!("typed {} characters", text_clone.len());
+                        }
+                    });
                 }
                 nfc::NfcEvent::Error(msg) => {
                     self.status_kind = StatusKind::Error;

@@ -13,10 +13,16 @@ pub struct Config {
     pub language: String,
     #[serde(default = "default_cooldown_ms")]
     pub cooldown_ms: u64,
+    #[serde(default = "default_typing_delay_ms")]
+    pub typing_delay_ms: u64,
 }
 
 fn default_cooldown_ms() -> u64 {
     2000
+}
+
+fn default_typing_delay_ms() -> u64 {
+    0
 }
 
 impl Default for Config {
@@ -26,6 +32,7 @@ impl Default for Config {
             append_enter: true,
             language: "ru".to_string(),
             cooldown_ms: default_cooldown_ms(),
+            typing_delay_ms: default_typing_delay_ms(),
         }
     }
 }

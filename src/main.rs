@@ -4,6 +4,7 @@ mod event_bus;
 mod i18n;
 mod nfc;
 mod single_shot;
+mod wedge;
 
 use tracing::Level;
 
