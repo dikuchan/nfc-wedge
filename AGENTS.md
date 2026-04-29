@@ -1,4 +1,4 @@
-# LLM Agent instructions
+# LLM agent instructions
 
 ## General
 
@@ -13,6 +13,7 @@
 * Error handling: use `anyhow` in business logic, use `thiserror` for library code, always add context.
 * Never use `.unwrap()` and `.expect()` outside of tests. Use `?` propagation.
 * Prefer functional iterator patterns over for loops.
+* Make invalid state unrepresentable. Heavily utilize type system.
 
 ## Rust: async
 
@@ -24,7 +25,8 @@
 
 * Don't use `println!`. Use the `tracing` crate for all logging.
 * Public API must have `///` rustdoc, including an `# Errors` section, if they return a `Result`.
-* Be discreet. Only comment on *why* the code is doing something, not *what* it is doing.
+* Be discreet with inline comments.
+* Only comment on *why* the code is doing something, not *what* it is doing.
 
 ## Rust: testing
 
@@ -32,9 +34,10 @@
 * Place unit tests in a `mod tests` block.
 * Place integration tests in the `/tests` directory.
 
-## PRs
+## PRs and commits
 
 * Must ask for commit approval after each change. Commit only after an explicit *OK*.
+* Do not bundle refactoring, formatting, and features in a single commit. Separate them.
 * Use Conventional Commits format.
 * Commit title should be a continuation of "When merged, this commit will {title}".
-* PR description must include *Why* the changes were made, not *What* the code does.
+* Commit description must include *why* the changes were made, not *what* the code does.
