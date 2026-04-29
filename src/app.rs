@@ -15,6 +15,15 @@ pub struct App {
     selected_reader: Option<String>,
     status_text: String,
     status_kind: StatusKind,
+    active_tab: Tab,
+    polling_enabled: bool,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum Tab {
+    Logs,
+    Settings,
+    Toggle,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -32,15 +41,24 @@ impl App {
         event_bus: EventBus,
     ) -> Self {
         let status_text = i18n.t("waiting_card");
+        let selected_reader = config.default_reader.clone();
+        
+        // Send default reader to NFC thread if configured
+        if let Some(ref reader) = selected_reader {
+            let _ = nfc_cmd.send(nfc::Command::SetReader(reader.clone()));
+        }
+        
         Self {
             config,
             i18n,
             nfc_cmd,
             event_bus,
             readers: Vec::new(),
-            selected_reader: None,
+            selected_reader,
             status_text,
             status_kind: StatusKind::Waiting,
+            active_tab: Tab::Settings,
+            polling_enabled: true,
         }
     }
 
@@ -93,59 +111,152 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll_nfc();
 
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading(self.i18n.t("settings"));
-
+        // Top panel with tabs
+        egui::TopBottomPanel::top("tabs").show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.label(self.i18n.t("reader"));
-
-                let current = self.selected_reader.as_deref().unwrap_or("");
-                egui::ComboBox::from_id_salt("reader_dropdown")
-                    .width(240.0)
-                    .selected_text(current)
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut self.selected_reader, None, "—");
-                        for r in &self.readers {
-                            if ui
-                                .selectable_value(
-                                    &mut self.selected_reader,
-                                    Some(r.clone()),
-                                    r.as_str(),
-                                )
-                                .clicked()
-                            {
-                                self.send_command(nfc::Command::SetReader(r.clone()));
-                            }
-                        }
-                    });
-
-                if ui.button(self.i18n.t("refresh")).clicked() {
-                    ctx.request_repaint();
-                }
+                ui.selectable_value(&mut self.active_tab, Tab::Settings, self.i18n.t("settings"));
+                ui.selectable_value(&mut self.active_tab, Tab::Logs, self.i18n.t("logs"));
+                ui.selectable_value(&mut self.active_tab, Tab::Toggle, self.i18n.t("enable_disable"));
             });
+        });
 
-            if let Some(ref reader) = self.selected_reader {
-                if ui.button(self.i18n.t("set_default")).clicked() {
-                    self.config.default_reader = Some(reader.clone());
-                    if let Err(e) = self.config.save() {
-                        tracing::error!("failed to save config: {e}");
-                    }
-                }
+        // Content panel based on active tab
+        egui::CentralPanel::default().show(ctx, |ui| {
+            match self.active_tab {
+                Tab::Settings => self.render_settings_tab(ui, ctx),
+                Tab::Logs => self.render_logs_tab(ui),
+                Tab::Toggle => self.render_toggle_tab(ui),
             }
-
-            ui.separator();
-
-            let color = match self.status_kind {
-                StatusKind::Waiting => ui.visuals().weak_text_color(),
-                StatusKind::Detected => egui::Color32::GREEN,
-                StatusKind::Error => egui::Color32::RED,
-            };
-
-            ui.colored_label(color, &self.status_text);
         });
 
         if ctx.input(|i| i.viewport().close_requested()) {
             self.send_command(nfc::Command::Shutdown);
         }
+    }
+}
+
+impl App {
+    fn render_settings_tab(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        ui.heading(self.i18n.t("settings"));
+
+        ui.horizontal(|ui| {
+            ui.label(self.i18n.t("reader"));
+
+            let current = self.selected_reader.as_deref().unwrap_or("");
+            egui::ComboBox::from_id_salt("reader_dropdown")
+                .width(240.0)
+                .selected_text(current)
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut self.selected_reader, None, "—");
+                    for r in &self.readers {
+                        if ui
+                            .selectable_value(
+                                &mut self.selected_reader,
+                                Some(r.clone()),
+                                r.as_str(),
+                            )
+                            .clicked()
+                        {
+                            self.send_command(nfc::Command::SetReader(r.clone()));
+                        }
+                    }
+                });
+
+            if ui.button(self.i18n.t("refresh")).clicked() {
+                ctx.request_repaint();
+            }
+        });
+
+        if let Some(ref reader) = self.selected_reader {
+            if ui.button(self.i18n.t("set_default")).clicked() {
+                self.config.default_reader = Some(reader.clone());
+                if let Err(e) = self.config.save() {
+                    tracing::error!("failed to save config: {e}");
+                }
+            }
+        }
+
+        ui.separator();
+
+        // Cooldown slider
+        ui.horizontal(|ui| {
+            ui.label(self.i18n.t("cooldown_ms"));
+            if ui.add(egui::Slider::new(&mut self.config.cooldown_ms, 0..=5000)).changed() {
+                if let Err(e) = self.config.save() {
+                    tracing::error!("failed to save config: {e}");
+                }
+            }
+        });
+
+        // Typing delay slider
+        ui.horizontal(|ui| {
+            ui.label(self.i18n.t("typing_delay_ms"));
+            if ui.add(egui::Slider::new(&mut self.config.typing_delay_ms, 0..=200)).changed() {
+                if let Err(e) = self.config.save() {
+                    tracing::error!("failed to save config: {e}");
+                }
+            }
+        });
+
+        // Append Enter checkbox
+        if ui.checkbox(&mut self.config.append_enter, self.i18n.t("append_enter")).changed() {
+            if let Err(e) = self.config.save() {
+                tracing::error!("failed to save config: {e}");
+            }
+        }
+
+        ui.separator();
+
+        // Status display
+        let color = match self.status_kind {
+            StatusKind::Waiting => ui.visuals().weak_text_color(),
+            StatusKind::Detected => egui::Color32::GREEN,
+            StatusKind::Error => egui::Color32::RED,
+        };
+
+        ui.colored_label(color, &self.status_text);
+    }
+
+    fn render_logs_tab(&mut self, ui: &mut egui::Ui) {
+        ui.heading(self.i18n.t("logs"));
+        ui.label("Log viewer will be implemented with custom tracing layer in future update.");
+    }
+
+    fn render_toggle_tab(&mut self, ui: &mut egui::Ui) {
+        ui.heading(self.i18n.t("enable_disable"));
+
+        ui.add_space(20.0);
+
+        let button_text = if self.polling_enabled {
+            self.i18n.t("disable_polling")
+        } else {
+            self.i18n.t("enable_polling")
+        };
+
+        if ui.button(button_text).clicked() {
+            self.polling_enabled = !self.polling_enabled;
+            let cmd = if self.polling_enabled {
+                nfc::Command::Resume
+            } else {
+                nfc::Command::Pause
+            };
+            self.send_command(cmd);
+        }
+
+        ui.add_space(10.0);
+
+        let status_text = if self.polling_enabled {
+            self.i18n.t("status_running")
+        } else {
+            self.i18n.t("status_stopped")
+        };
+
+        let color = if self.polling_enabled {
+            egui::Color32::GREEN
+        } else {
+            egui::Color32::RED
+        };
+
+        ui.colored_label(color, status_text);
     }
 }
