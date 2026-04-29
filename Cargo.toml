@@ -12,7 +12,8 @@ directories = "5.0"
 anyhow = "1.0"
 thiserror = "1.0"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "registry"] }
+chrono = "0.4"
 pcsc = "2.8"
 crossbeam-channel = "0.5"
 ndef-rs = "0.2.3"

@@ -4,6 +4,7 @@ use eframe::egui;
 use crate::config::Config;
 use crate::event_bus::EventBus;
 use crate::i18n::I18n;
+use crate::log_buffer::LogBuffer;
 use crate::nfc;
 use crate::tray::TrayManager;
 
@@ -21,6 +22,7 @@ pub struct App {
     tray: Option<TrayManager>,
     should_exit: bool,
     auto_start_enabled: bool,
+    log_buffer: LogBuffer,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -43,6 +45,7 @@ impl App {
         i18n: I18n,
         nfc_cmd: Sender<nfc::Command>,
         event_bus: EventBus,
+        log_buffer: LogBuffer,
     ) -> Self {
         let status_text = i18n.t("waiting_card");
         let selected_reader = config.default_reader.clone();
@@ -78,6 +81,7 @@ impl App {
             tray,
             should_exit: false,
             auto_start_enabled,
+            log_buffer,
         }
     }
 
@@ -283,7 +287,32 @@ impl App {
 
     fn render_logs_tab(&mut self, ui: &mut egui::Ui) {
         ui.heading(self.i18n.t("logs"));
-        ui.label("Log viewer will be implemented with custom tracing layer in future update.");
+        
+        ui.separator();
+        
+        let logs = self.log_buffer.get_all();
+        
+        egui::ScrollArea::vertical()
+            .auto_shrink([false; 2])
+            .show(ui, |ui| {
+                ui.style_mut().override_text_style = Some(egui::TextStyle::Monospace);
+                
+                for entry in &logs {
+                    let level_color = match entry.level.as_str() {
+                        "ERROR" => egui::Color32::RED,
+                        "WARN" => egui::Color32::YELLOW,
+                        "INFO" => egui::Color32::LIGHT_BLUE,
+                        "DEBUG" => egui::Color32::LIGHT_GRAY,
+                        _ => egui::Color32::WHITE,
+                    };
+                    
+                    ui.horizontal(|ui| {
+                        ui.label(&entry.timestamp);
+                        ui.colored_label(level_color, format!("[{}]", entry.level));
+                        ui.label(&entry.message);
+                    });
+                }
+            });
     }
 
     fn render_toggle_tab(&mut self, ui: &mut egui::Ui) {
@@ -299,12 +328,17 @@ impl App {
 
         if ui.button(button_text).clicked() {
             self.polling_enabled = !self.polling_enabled;
-            let cmd = if self.polling_enabled {
-                nfc::Command::Resume
+            if self.polling_enabled {
+                // Resume: restore selected reader
+                if let Some(ref reader) = self.selected_reader {
+                    self.send_command(nfc::Command::SetReader(reader.clone()));
+                } else {
+                    self.send_command(nfc::Command::Resume);
+                }
             } else {
-                nfc::Command::Pause
-            };
-            self.send_command(cmd);
+                // Pause: stop polling
+                self.send_command(nfc::Command::Pause);
+            }
         }
 
         ui.add_space(10.0);

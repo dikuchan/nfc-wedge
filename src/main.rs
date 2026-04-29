@@ -3,18 +3,26 @@ mod auto_start;
 mod config;
 mod event_bus;
 mod i18n;
+mod log_buffer;
 mod nfc;
 mod single_shot;
 mod tray;
 mod wedge;
 
-use tracing::Level;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
 fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
+    let log_buffer = log_buffer::LogBuffer::new();
+    let log_layer = log_buffer::LogBufferLayer::new(log_buffer.clone());
+    
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_subscriber::EnvFilter::new(
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string())
+        ))
+        .with(log_layer)
         .init();
-
 
     let config = config::Config::load()?;
     let i18n = i18n::I18n::new(&config.language)?;
@@ -37,7 +45,7 @@ fn main() -> anyhow::Result<()> {
             let (_nfc_handle, nfc_cmd) = nfc::start(nfc_event_sender, config.cooldown_ms)
                 .expect("Failed to start NFC thread");
 
-            let app = app::App::new(config, i18n, nfc_cmd, event_bus);
+            let app = app::App::new(config, i18n, nfc_cmd, event_bus, log_buffer.clone());
             Ok(Box::new(app))
         }),
     )
