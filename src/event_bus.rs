@@ -7,6 +7,7 @@ use crate::nfc::NfcEvent;
 /// Manages communication between business logic threads (NFC) and UI thread.
 pub struct EventBus {
     nfc_rx: Receiver<NfcEvent>,
+    #[allow(dead_code)]
     wake_fn: Arc<dyn Fn() + Send + Sync>,
 }
 

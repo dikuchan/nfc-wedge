@@ -43,6 +43,7 @@ impl CooldownGuard {
     }
 
     /// Updates cooldown duration.
+    #[allow(dead_code)]
     pub fn set_cooldown(&mut self, cooldown: Duration) {
         self.cooldown = cooldown;
     }

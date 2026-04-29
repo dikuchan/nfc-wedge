@@ -21,6 +21,7 @@ pub struct App {
     polling_enabled: bool,
     tray: Option<TrayManager>,
     should_exit: bool,
+    #[cfg(target_os = "windows")]
     auto_start_enabled: bool,
     log_buffer: LogBuffer,
 }
@@ -64,9 +65,6 @@ impl App {
             }
         };
         
-        // Check auto-start status
-        let auto_start_enabled = crate::auto_start::is_enabled().unwrap_or(false);
-        
         Self {
             config,
             i18n,
@@ -80,7 +78,8 @@ impl App {
             polling_enabled: true,
             tray,
             should_exit: false,
-            auto_start_enabled,
+            #[cfg(target_os = "windows")]
+            auto_start_enabled: crate::auto_start::is_enabled().unwrap_or(false),
             log_buffer,
         }
     }
@@ -216,12 +215,11 @@ impl App {
             }
         });
 
-        if let Some(ref reader) = self.selected_reader {
-            if ui.button(self.i18n.t("set_default")).clicked() {
-                self.config.default_reader = Some(reader.clone());
-                if let Err(e) = self.config.save() {
-                    tracing::error!("failed to save config: {e}");
-                }
+        if let Some(ref reader) = self.selected_reader
+            && ui.button(self.i18n.t("set_default")).clicked() {
+            self.config.default_reader = Some(reader.clone());
+            if let Err(e) = self.config.save() {
+                tracing::error!("failed to save config: {e}");
             }
         }
 
@@ -230,28 +228,28 @@ impl App {
         // Cooldown slider
         ui.horizontal(|ui| {
             ui.label(self.i18n.t("cooldown_ms"));
-            if ui.add(egui::Slider::new(&mut self.config.cooldown_ms, 0..=5000)).changed() {
-                if let Err(e) = self.config.save() {
-                    tracing::error!("failed to save config: {e}");
-                }
+            if ui.add(egui::Slider::new(&mut self.config.cooldown_ms, 0..=5000)).changed()
+                && let Err(e) = self.config.save()
+            {
+                tracing::error!("failed to save config: {e}");
             }
         });
 
         // Typing delay slider
         ui.horizontal(|ui| {
             ui.label(self.i18n.t("typing_delay_ms"));
-            if ui.add(egui::Slider::new(&mut self.config.typing_delay_ms, 0..=200)).changed() {
-                if let Err(e) = self.config.save() {
-                    tracing::error!("failed to save config: {e}");
-                }
+            if ui.add(egui::Slider::new(&mut self.config.typing_delay_ms, 0..=200)).changed()
+                && let Err(e) = self.config.save()
+            {
+                tracing::error!("failed to save config: {e}");
             }
         });
 
         // Append Enter checkbox
-        if ui.checkbox(&mut self.config.append_enter, self.i18n.t("append_enter")).changed() {
-            if let Err(e) = self.config.save() {
-                tracing::error!("failed to save config: {e}");
-            }
+        if ui.checkbox(&mut self.config.append_enter, self.i18n.t("append_enter")).changed()
+            && let Err(e) = self.config.save()
+        {
+            tracing::error!("failed to save config: {e}");
         }
 
         ui.separator();

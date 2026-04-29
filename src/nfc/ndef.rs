@@ -16,7 +16,7 @@ pub fn extract_text(data: &[u8]) -> Option<String> {
     };
     let records = message.records();
     tracing::debug!("NDEF message has {} records", records.len());
-    records.into_iter().find_map(|record| {
+    records.iter().find_map(|record| {
         // Check if this is a Text record (TNF=WellKnown, Type="T")
         if record.tnf() != ndef_rs::TNF::WellKnown {
             return None;

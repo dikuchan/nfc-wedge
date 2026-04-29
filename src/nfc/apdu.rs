@@ -1,5 +1,3 @@
-/// APDU builders and response helpers for NFC tag communication.
-
 /// PC/SC escape command to read memory on Type 2 tags (MIFARE Ultralight / NTAG).
 /// `FF B0 00 [page] [len]`
 pub fn type2_read_binary(page: u8, len: u8) -> Vec<u8> {

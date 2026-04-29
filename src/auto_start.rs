@@ -59,16 +59,19 @@ pub fn disable() -> Result<()> {
 
 // macOS stubs - do nothing
 #[cfg(not(target_os = "windows"))]
+#[allow(unused)]
 pub fn is_enabled() -> Result<bool> {
     Ok(false)
 }
 
 #[cfg(not(target_os = "windows"))]
+#[allow(unused)]
 pub fn enable() -> Result<()> {
     Ok(())
 }
 
 #[cfg(not(target_os = "windows"))]
+#[allow(unused)]
 pub fn disable() -> Result<()> {
     Ok(())
 }

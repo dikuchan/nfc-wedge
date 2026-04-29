@@ -172,10 +172,10 @@ fn run(cmd_rx: Receiver<Command>, evt_tx: NfcEventSender, cooldown_ms: u64) {
         reader_list_counter += 1;
         if reader_list_counter >= 20 {
             reader_list_counter = 0;
-            if let Ok(readers) = pcsc::list_readers(&p_ctx) {
-                if !readers.is_empty() {
-                    evt_tx.send(NfcEvent::Readers(readers));
-                }
+            if let Ok(readers) = pcsc::list_readers(&p_ctx)
+                && !readers.is_empty()
+            {
+                evt_tx.send(NfcEvent::Readers(readers));
             }
         }
         
