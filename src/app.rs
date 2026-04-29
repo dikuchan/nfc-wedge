@@ -20,6 +20,7 @@ pub struct App {
     polling_enabled: bool,
     tray: Option<TrayManager>,
     should_exit: bool,
+    auto_start_enabled: bool,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -60,6 +61,9 @@ impl App {
             }
         };
         
+        // Check auto-start status
+        let auto_start_enabled = crate::auto_start::is_enabled().unwrap_or(false);
+        
         Self {
             config,
             i18n,
@@ -73,6 +77,7 @@ impl App {
             polling_enabled: true,
             tray,
             should_exit: false,
+            auto_start_enabled,
         }
     }
 
@@ -245,6 +250,25 @@ impl App {
             }
         }
 
+        ui.separator();
+
+        // Auto-start checkbox (Windows only)
+        #[cfg(target_os = "windows")]
+        {
+            if ui.checkbox(&mut self.auto_start_enabled, self.i18n.t("auto_start")).changed() {
+                let result = if self.auto_start_enabled {
+                    crate::auto_start::enable()
+                } else {
+                    crate::auto_start::disable()
+                };
+                
+                if let Err(e) = result {
+                    tracing::error!("failed to update auto-start: {e}");
+                    self.auto_start_enabled = !self.auto_start_enabled;
+                }
+            }
+        }
+        
         ui.separator();
 
         // Status display

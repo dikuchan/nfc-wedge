@@ -1,4 +1,5 @@
 mod app;
+mod auto_start;
 mod config;
 mod event_bus;
 mod i18n;
