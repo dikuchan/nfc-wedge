@@ -118,6 +118,7 @@ fn run(cmd_rx: Receiver<Command>, evt_tx: NfcEventSender, cooldown_ms: u64) {
     let mut selected_reader: Option<String> = None;
     let mut was_present = false;
     let mut card_read = false;
+    let mut reader_list_counter = 0u32;
 
     loop {
         while let Ok(cmd) = cmd_rx.try_recv() {
@@ -165,13 +166,19 @@ fn run(cmd_rx: Receiver<Command>, evt_tx: NfcEventSender, cooldown_ms: u64) {
                     selected_reader = None;
                 }
             }
-        } else {
+        }
+        
+        // Enumerate readers periodically (every 2 seconds)
+        reader_list_counter += 1;
+        if reader_list_counter >= 20 {
+            reader_list_counter = 0;
             if let Ok(readers) = pcsc::list_readers(&p_ctx) {
                 if !readers.is_empty() {
                     evt_tx.send(NfcEvent::Readers(readers));
                 }
             }
         }
+        
         thread::sleep(Duration::from_millis(100));
     }
 }
