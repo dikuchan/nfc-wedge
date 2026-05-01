@@ -85,6 +85,7 @@ The installer:
 ### System Tray
 
 - Click **X** to minimize to tray (doesn't exit)
+- Window stays in taskbar when minimized (standard Windows behavior)
 - Right-click tray icon:
   - **Показать (Show)**: Restore window
   - **Выход (Exit)**: Quit application

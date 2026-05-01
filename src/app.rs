@@ -134,7 +134,7 @@ impl App {
             let (show, exit) = tray.poll_events();
             
             if show {
-                ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+                ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
                 ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
             }
             
@@ -171,12 +171,12 @@ impl eframe::App for App {
             }
         });
 
-        // Handle close button: hide to tray instead of exit
+        // Handle close button: minimize to tray instead of exit
         if ctx.input(|i| i.viewport().close_requested()) {
             if self.should_exit {
                 self.send_command(nfc::Command::Shutdown);
             } else {
-                ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+                ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
                 ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
             }
         }
