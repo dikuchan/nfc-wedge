@@ -47,7 +47,12 @@ fn main() -> anyhow::Result<()> {
             let (_nfc_handle, nfc_cmd) = nfc::start(nfc_event_sender, config.cooldown_ms)
                 .expect("Failed to start NFC thread");
 
-            let app = app::App::new(config, i18n, nfc_cmd, event_bus, log_buffer.clone());
+            let wake_fn = {
+                let ctx = cc.egui_ctx.clone();
+                move || ctx.request_repaint()
+            };
+            
+            let app = app::App::new(config, i18n, nfc_cmd, event_bus, log_buffer.clone(), wake_fn);
             Ok(Box::new(app))
         }),
     )

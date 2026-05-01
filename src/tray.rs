@@ -19,7 +19,7 @@ impl TrayManager {
     /// # Errors
     ///
     /// Returns error if tray icon creation fails.
-    pub fn new(show_label: &str, exit_label: &str) -> Result<Self> {
+    pub fn new(show_label: &str, exit_label: &str, wake_fn: impl Fn() + Send + Sync + 'static) -> Result<Self> {
         let icon = Self::generate_icon()?;
         
         let menu = Menu::new();
@@ -46,12 +46,15 @@ impl TrayManager {
         let exit_id = exit_item.id().clone();
         let show_flag = show_requested.clone();
         let exit_flag = exit_requested.clone();
+        let wake = Arc::new(wake_fn);
         
         MenuEvent::set_event_handler(Some(move |event: MenuEvent| {
             if event.id() == &show_id {
                 show_flag.store(true, Ordering::SeqCst);
+                wake();
             } else if event.id() == &exit_id {
                 exit_flag.store(true, Ordering::SeqCst);
+                wake();
             }
         }));
         

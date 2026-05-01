@@ -47,6 +47,7 @@ impl App {
         nfc_cmd: Sender<nfc::Command>,
         event_bus: EventBus,
         log_buffer: LogBuffer,
+        wake_fn: impl Fn() + Send + Sync + 'static,
     ) -> Self {
         let status_text = i18n.t("waiting_card");
         let selected_reader = config.default_reader.clone();
@@ -57,7 +58,7 @@ impl App {
         }
         
         // Create tray icon
-        let tray = match TrayManager::new(&i18n.t("show"), &i18n.t("exit")) {
+        let tray = match TrayManager::new(&i18n.t("show"), &i18n.t("exit"), wake_fn) {
             Ok(tray) => Some(tray),
             Err(e) => {
                 tracing::error!("failed to create tray icon: {e}");
@@ -147,9 +148,8 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Keep update loop running even when window is hidden (for tray polling)
-        ctx.request_repaint_after(std::time::Duration::from_millis(100));
-        
+        // Poll NFC events and tray events
+        // Note: Tray events wake us up via request_repaint() in the event handler
         self.poll_nfc();
         self.poll_tray(ctx);
 
