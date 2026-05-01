@@ -51,6 +51,10 @@ impl TrayManager {
         let exit_flag = exit_requested.clone();
         let wake = Arc::new(wake_fn);
         
+        // Clone wake Arc for Windows polling thread before moving into MenuEvent handler
+        #[cfg(target_os = "windows")]
+        let wake_for_thread = Arc::clone(&wake);
+        
         MenuEvent::set_event_handler(Some(move |event: MenuEvent| {
             if event.id() == &show_id {
                 show_flag.store(true, Ordering::SeqCst);
@@ -65,7 +69,6 @@ impl TrayManager {
         // This ensures the event loop keeps running even when the window is hidden
         #[cfg(target_os = "windows")]
         {
-            let wake_clone = Arc::clone(&wake);
             let show_flag_clone = Arc::clone(&show_requested);
             let exit_flag_clone = Arc::clone(&exit_requested);
             
@@ -74,7 +77,7 @@ impl TrayManager {
                     thread::sleep(Duration::from_millis(100));
                     // If there are pending tray events, wake the UI
                     if show_flag_clone.load(Ordering::SeqCst) || exit_flag_clone.load(Ordering::SeqCst) {
-                        wake_clone();
+                        wake_for_thread();
                     }
                 }
             });
