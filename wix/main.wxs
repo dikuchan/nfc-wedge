@@ -87,7 +87,18 @@
 
         <Directory Id='TARGETDIR' Name='SourceDir'>
             <Directory Id='ProgramMenuFolder'>
-                <Directory Id='ApplicationProgramsFolder' Name='NFC Wedge'/>
+                <Directory Id='ApplicationProgramsFolder' Name='NFC Wedge'>
+                    <Component Id='ApplicationShortcut' Guid='*'>
+                        <Shortcut
+                            Id='ApplicationStartMenuShortcut'
+                            Name='NFC Wedge'
+                            Description='NFC NDEF text reader with keyboard wedge'
+                            Target='[Bin]nfc-wedge.exe'
+                            WorkingDirectory='Bin'/>
+                        <RemoveFolder Id='ApplicationProgramsFolder' On='uninstall'/>
+                        <RegistryValue Root='HKCU' Key='Software\dikuchan\nfc-wedge' Name='installed' Type='integer' Value='1' KeyPath='yes'/>
+                    </Component>
+                </Directory>
             </Directory>
             <Directory Id='$(var.PlatformProgramFilesFolder)' Name='PFiles'>
                 <Directory Id='APPLICATIONFOLDER' Name='nfc-wedge'>
@@ -123,19 +134,8 @@
                                 DiskId='1'
                                 Source='$(var.CargoTargetBinDir)\nfc-wedge.exe'
                                 KeyPath='yes'/>
-                            <Shortcut
-                                Id='ApplicationStartMenuShortcut'
-                                Name='NFC Wedge'
-                                Description='NFC NDEF text reader with keyboard wedge'
-                                Directory='ApplicationProgramsFolder'
-                                WorkingDirectory='APPLICATIONFOLDER'
-                                Advertise='yes'/>
                         </Component>
                     </Directory>
-                    <Component Id='ApplicationShortcutRemove' Guid='*'>
-                        <RemoveFolder Id='ApplicationProgramsFolder' On='uninstall'/>
-                        <RegistryValue Root='HKCU' Key='Software\dikuchan\nfc-wedge' Name='installed' Type='integer' Value='1' KeyPath='yes'/>
-                    </Component>
                 </Directory>
             </Directory>
         </Directory>
@@ -156,7 +156,7 @@
             <ComponentRef Id='License'/>
             
             <ComponentRef Id='binary0'/>
-            <ComponentRef Id='ApplicationShortcutRemove'/>
+            <ComponentRef Id='ApplicationShortcut'/>
 
             <Feature
                 Id='Environment'
