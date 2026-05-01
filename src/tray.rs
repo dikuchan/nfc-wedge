@@ -6,6 +6,9 @@ use tray_icon::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+#[cfg(target_os = "windows")]
+use std::{thread, time::Duration};
+
 /// Tray icon manager with show/exit menu.
 pub struct TrayManager {
     _tray_icon: TrayIcon,
@@ -57,6 +60,25 @@ impl TrayManager {
                 wake();
             }
         }));
+        
+        // On Windows, spawn a background thread to continuously wake the UI
+        // This ensures the event loop keeps running even when the window is hidden
+        #[cfg(target_os = "windows")]
+        {
+            let wake_clone = Arc::clone(&wake);
+            let show_flag_clone = Arc::clone(&show_requested);
+            let exit_flag_clone = Arc::clone(&exit_requested);
+            
+            thread::spawn(move || {
+                loop {
+                    thread::sleep(Duration::from_millis(100));
+                    // If there are pending tray events, wake the UI
+                    if show_flag_clone.load(Ordering::SeqCst) || exit_flag_clone.load(Ordering::SeqCst) {
+                        wake_clone();
+                    }
+                }
+            });
+        }
         
         Ok(Self {
             _tray_icon: tray_icon,
