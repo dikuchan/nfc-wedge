@@ -93,8 +93,8 @@
                             Id='ApplicationStartMenuShortcut'
                             Name='NFC Wedge'
                             Description='NFC NDEF text reader with keyboard wedge'
-                            Target='[Bin]nfc-wedge.exe'
-                            WorkingDirectory='Bin'/>
+                            Target='[#exe0]'
+                            WorkingDirectory='APPLICATIONFOLDER'/>
                         <RemoveFolder Id='ApplicationProgramsFolder' On='uninstall'/>
                         <RegistryValue Root='HKCU' Key='Software\dikuchan\nfc-wedge' Name='installed' Type='integer' Value='1' KeyPath='yes'/>
                     </Component>
