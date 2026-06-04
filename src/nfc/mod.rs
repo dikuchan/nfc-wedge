@@ -39,12 +39,44 @@ impl NfcEvent {
 }
 
 /// Spawn NFC worker thread. Returns (handle, command_sender).
-pub fn start(event_sender: NfcEventSender, cooldown_ms: u64) -> Result<(thread::JoinHandle<()>, Sender<Command>)> {
+pub fn start(
+    event_sender: NfcEventSender,
+    cooldown_ms: u64,
+) -> Result<(thread::JoinHandle<()>, Sender<Command>)> {
     let (cmd_tx, cmd_rx) = crossbeam_channel::bounded(16);
 
     let handle = thread::spawn(move || run(cmd_rx, event_sender, cooldown_ms));
 
     Ok((handle, cmd_tx))
+}
+
+fn is_transient_connect_error(e: ::pcsc::Error) -> bool {
+    matches!(
+        e,
+        ::pcsc::Error::NoSmartcard
+            | ::pcsc::Error::SharingViolation
+            | ::pcsc::Error::NotReady
+            | ::pcsc::Error::ServerTooBusy
+            | ::pcsc::Error::CommError
+            | ::pcsc::Error::ProtoMismatch
+            | ::pcsc::Error::ReaderUnavailable
+            | ::pcsc::Error::ResetCard
+            | ::pcsc::Error::UnpoweredCard
+            | ::pcsc::Error::UnresponsiveCard
+    )
+}
+
+fn is_fatal_poll_error(e: ::pcsc::Error) -> bool {
+    matches!(
+        e,
+        ::pcsc::Error::UnknownReader
+            | ::pcsc::Error::NoService
+            | ::pcsc::Error::ServiceStopped
+            | ::pcsc::Error::InvalidHandle
+            | ::pcsc::Error::NoReadersAvailable
+            | ::pcsc::Error::Cancelled
+            | ::pcsc::Error::SystemCancelled
+    )
 }
 
 fn try_connect_and_read(
@@ -57,8 +89,7 @@ fn try_connect_and_read(
         match pcsc::connect_card(p_ctx, reader) {
             Ok(card) => {
                 tracing::info!("connected to card on {reader}, attempt {attempt}");
-                
-                // Get UID for deduplication
+
                 let uid = match tag::get_uid(&card) {
                     Ok(uid) => uid,
                     Err(e) => {
@@ -66,19 +97,18 @@ fn try_connect_and_read(
                         vec![]
                     }
                 };
-                
-                // Check cooldown guard
+
                 if !uid.is_empty() && !guard.should_process(&uid) {
                     tracing::debug!("card read blocked by cooldown");
                     let _ = pcsc::disconnect_card(card);
                     return Ok(());
                 }
-                
+
                 match tag::read_tag(&card) {
                     Ok(data) => {
                         tracing::info!("read {} bytes from card", data.len());
-                        let text = ndef::extract_text(&data)
-                            .unwrap_or_else(|| ndef::fallback_text(&data));
+                        let text =
+                            ndef::extract_text(&data).unwrap_or_else(|| ndef::fallback_text(&data));
                         evt_tx.send(NfcEvent::Text(text));
                     }
                     Err(e) => {
@@ -92,7 +122,8 @@ fn try_connect_and_read(
                 let _ = pcsc::disconnect_card(card);
                 return Ok(());
             }
-            Err(::pcsc::Error::NoSmartcard) => {
+            Err(e) if is_transient_connect_error(e) => {
+                tracing::debug!("transient connect error on attempt {attempt}: {e}");
                 if attempt < 5 {
                     thread::sleep(Duration::from_millis(200));
                 }
@@ -161,13 +192,19 @@ fn run(cmd_rx: Receiver<Command>, evt_tx: NfcEventSender, cooldown_ms: u64) {
                     }
                 }
                 Err(::pcsc::Error::Timeout) => {}
-                Err(e) => {
+                Err(e) if is_fatal_poll_error(e) => {
+                    tracing::error!("fatal poll error on {reader}: {e}, dropping reader");
                     evt_tx.send(NfcEvent::Error(format!("{reader}: {e}")));
+                    was_present = false;
+                    card_read = false;
                     selected_reader = None;
+                }
+                Err(e) => {
+                    tracing::debug!("transient poll error on {reader}: {e}");
                 }
             }
         }
-        
+
         // Enumerate readers periodically (every 2 seconds)
         reader_list_counter += 1;
         if reader_list_counter >= 20 {
@@ -178,7 +215,7 @@ fn run(cmd_rx: Receiver<Command>, evt_tx: NfcEventSender, cooldown_ms: u64) {
                 evt_tx.send(NfcEvent::Readers(readers));
             }
         }
-        
+
         thread::sleep(Duration::from_millis(100));
     }
 }

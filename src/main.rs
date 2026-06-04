@@ -11,19 +11,21 @@ mod single_shot;
 mod tray;
 mod wedge;
 
+use tracing_subscriber::Layer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
 fn main() -> anyhow::Result<()> {
     let log_buffer = log_buffer::LogBuffer::new();
     let log_layer = log_buffer::LogBufferLayer::new(log_buffer.clone());
-    
+
     tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer())
-        .with(tracing_subscriber::EnvFilter::new(
-            std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string())
-        ))
-        .with(log_layer)
+        .with(
+            tracing_subscriber::fmt::layer().with_filter(tracing_subscriber::EnvFilter::new(
+                std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string()),
+            )),
+        )
+        .with(log_layer.with_filter(tracing_subscriber::filter::LevelFilter::DEBUG))
         .init();
 
     let config = config::Config::load()?;
@@ -51,8 +53,15 @@ fn main() -> anyhow::Result<()> {
                 let ctx = cc.egui_ctx.clone();
                 move || ctx.request_repaint()
             };
-            
-            let app = app::App::new(config, i18n, nfc_cmd, event_bus, log_buffer.clone(), wake_fn);
+
+            let app = app::App::new(
+                config,
+                i18n,
+                nfc_cmd,
+                event_bus,
+                log_buffer.clone(),
+                wake_fn,
+            );
             Ok(Box::new(app))
         }),
     )
