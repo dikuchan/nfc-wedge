@@ -60,8 +60,7 @@ impl Config {
                 .with_context(|| format!("failed to create config dir {:?}", parent))?;
         }
         let tmp = path.with_extension("tmp");
-        let contents = serde_json::to_string_pretty(self)
-            .context("failed to serialize config")?;
+        let contents = serde_json::to_string_pretty(self).context("failed to serialize config")?;
         let mut file = fs::File::create(&tmp)
             .with_context(|| format!("failed to create temp config {:?}", tmp))?;
         file.write_all(contents.as_bytes())

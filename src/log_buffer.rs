@@ -55,14 +55,14 @@ where
     fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
         let metadata = event.metadata();
         let level = metadata.level().to_string();
-        
+
         let mut message = String::new();
         let mut visitor = MessageVisitor(&mut message);
         event.record(&mut visitor);
-        
+
         let now = chrono::Local::now();
         let timestamp = now.format("%H:%M:%S").to_string();
-        
+
         self.buffer.push(LogEntry {
             timestamp,
             level,
@@ -84,7 +84,7 @@ impl<'a> tracing::field::Visit for MessageVisitor<'a> {
             self.0.push_str(&format!("{}={:?}", field.name(), value));
         }
     }
-    
+
     fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
         if !self.0.is_empty() {
             self.0.push(' ');

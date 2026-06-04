@@ -4,7 +4,6 @@ pub fn type2_read_binary(page: u8, len: u8) -> Vec<u8> {
     vec![0xFF, 0xB0, 0x00, page, len]
 }
 
-
 /// Parse status word from last 2 bytes of response. Returns (sw1, sw2).
 pub fn parse_sw(response: &[u8]) -> Option<(u8, u8)> {
     if response.len() >= 2 {

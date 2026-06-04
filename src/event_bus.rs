@@ -17,20 +17,17 @@ impl EventBus {
     pub fn new(wake_fn: impl Fn() + Send + Sync + 'static) -> (Self, NfcEventSender) {
         let (nfc_tx, nfc_rx) = crossbeam_channel::bounded(64);
         let wake = Arc::new(wake_fn);
-        
+
         let bus = Self {
             nfc_rx,
             wake_fn: wake.clone(),
         };
-        
-        let sender = NfcEventSender {
-            tx: nfc_tx,
-            wake,
-        };
-        
+
+        let sender = NfcEventSender { tx: nfc_tx, wake };
+
         (bus, sender)
     }
-    
+
     /// Poll NFC events. Returns an iterator that drains all pending events.
     pub fn poll_nfc_events(&self) -> impl Iterator<Item = NfcEvent> + '_ {
         std::iter::from_fn(|| self.nfc_rx.try_recv().ok())

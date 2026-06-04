@@ -51,12 +51,12 @@ impl App {
     ) -> Self {
         let status_text = i18n.t("waiting_card");
         let selected_reader = config.default_reader.clone();
-        
+
         // Send default reader to NFC thread if configured
         if let Some(ref reader) = selected_reader {
             let _ = nfc_cmd.send(nfc::Command::SetReader(reader.clone()));
         }
-        
+
         // Create tray icon
         let tray = match TrayManager::new(&i18n.t("show"), &i18n.t("exit"), wake_fn) {
             Ok(tray) => Some(tray),
@@ -65,7 +65,7 @@ impl App {
                 None
             }
         };
-        
+
         Self {
             config,
             i18n,
@@ -102,7 +102,7 @@ impl App {
                 nfc::NfcEvent::Text(text) => {
                     self.status_kind = StatusKind::Detected;
                     self.status_text = format!("{}: {}", self.i18n.t("read_text"), text);
-                    
+
                     // Spawn blocking task to type text into active window
                     let text_clone = text.clone();
                     let delay = self.config.typing_delay_ms;
@@ -128,16 +128,16 @@ impl App {
             tracing::warn!("failed to send NFC command: {e}");
         }
     }
-    
+
     fn poll_tray(&mut self, ctx: &egui::Context) {
         if let Some(ref tray) = self.tray {
             let (show, exit) = tray.poll_events();
-            
+
             if show {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
                 ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
             }
-            
+
             if exit {
                 self.should_exit = true;
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
@@ -158,17 +158,19 @@ impl eframe::App for App {
             ui.horizontal(|ui| {
                 ui.selectable_value(&mut self.active_tab, Tab::Settings, self.i18n.t("settings"));
                 ui.selectable_value(&mut self.active_tab, Tab::Logs, self.i18n.t("logs"));
-                ui.selectable_value(&mut self.active_tab, Tab::Toggle, self.i18n.t("enable_disable"));
+                ui.selectable_value(
+                    &mut self.active_tab,
+                    Tab::Toggle,
+                    self.i18n.t("enable_disable"),
+                );
             });
         });
 
         // Content panel based on active tab
-        egui::CentralPanel::default().show(ctx, |ui| {
-            match self.active_tab {
-                Tab::Settings => self.render_settings_tab(ui, ctx),
-                Tab::Logs => self.render_logs_tab(ui),
-                Tab::Toggle => self.render_toggle_tab(ui),
-            }
+        egui::CentralPanel::default().show(ctx, |ui| match self.active_tab {
+            Tab::Settings => self.render_settings_tab(ui, ctx),
+            Tab::Logs => self.render_logs_tab(ui),
+            Tab::Toggle => self.render_toggle_tab(ui),
         });
 
         // Handle close button: minimize to tray instead of exit
@@ -216,7 +218,8 @@ impl App {
         });
 
         if let Some(ref reader) = self.selected_reader
-            && ui.button(self.i18n.t("set_default")).clicked() {
+            && ui.button(self.i18n.t("set_default")).clicked()
+        {
             self.config.default_reader = Some(reader.clone());
             if let Err(e) = self.config.save() {
                 tracing::error!("failed to save config: {e}");
@@ -228,7 +231,9 @@ impl App {
         // Cooldown slider
         ui.horizontal(|ui| {
             ui.label(self.i18n.t("cooldown_ms"));
-            if ui.add(egui::Slider::new(&mut self.config.cooldown_ms, 0..=5000)).changed()
+            if ui
+                .add(egui::Slider::new(&mut self.config.cooldown_ms, 0..=5000))
+                .changed()
                 && let Err(e) = self.config.save()
             {
                 tracing::error!("failed to save config: {e}");
@@ -238,7 +243,9 @@ impl App {
         // Typing delay slider
         ui.horizontal(|ui| {
             ui.label(self.i18n.t("typing_delay_ms"));
-            if ui.add(egui::Slider::new(&mut self.config.typing_delay_ms, 0..=200)).changed()
+            if ui
+                .add(egui::Slider::new(&mut self.config.typing_delay_ms, 0..=200))
+                .changed()
                 && let Err(e) = self.config.save()
             {
                 tracing::error!("failed to save config: {e}");
@@ -246,7 +253,9 @@ impl App {
         });
 
         // Append Enter checkbox
-        if ui.checkbox(&mut self.config.append_enter, self.i18n.t("append_enter")).changed()
+        if ui
+            .checkbox(&mut self.config.append_enter, self.i18n.t("append_enter"))
+            .changed()
             && let Err(e) = self.config.save()
         {
             tracing::error!("failed to save config: {e}");
@@ -257,20 +266,23 @@ impl App {
         // Auto-start checkbox (Windows only)
         #[cfg(target_os = "windows")]
         {
-            if ui.checkbox(&mut self.auto_start_enabled, self.i18n.t("auto_start")).changed() {
+            if ui
+                .checkbox(&mut self.auto_start_enabled, self.i18n.t("auto_start"))
+                .changed()
+            {
                 let result = if self.auto_start_enabled {
                     crate::auto_start::enable()
                 } else {
                     crate::auto_start::disable()
                 };
-                
+
                 if let Err(e) = result {
                     tracing::error!("failed to update auto-start: {e}");
                     self.auto_start_enabled = !self.auto_start_enabled;
                 }
             }
         }
-        
+
         ui.separator();
 
         // Status display
@@ -285,16 +297,16 @@ impl App {
 
     fn render_logs_tab(&mut self, ui: &mut egui::Ui) {
         ui.heading(self.i18n.t("logs"));
-        
+
         ui.separator();
-        
+
         let logs = self.log_buffer.get_all();
-        
+
         egui::ScrollArea::vertical()
             .auto_shrink([false; 2])
             .show(ui, |ui| {
                 ui.style_mut().override_text_style = Some(egui::TextStyle::Monospace);
-                
+
                 for entry in &logs {
                     let level_color = match entry.level.as_str() {
                         "ERROR" => egui::Color32::RED,
@@ -303,7 +315,7 @@ impl App {
                         "DEBUG" => egui::Color32::LIGHT_GRAY,
                         _ => egui::Color32::WHITE,
                     };
-                    
+
                     ui.horizontal(|ui| {
                         ui.label(&entry.timestamp);
                         ui.colored_label(level_color, format!("[{}]", entry.level));

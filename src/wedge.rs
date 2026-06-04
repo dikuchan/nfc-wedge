@@ -11,8 +11,7 @@ static ENIGO_INSTANCE: OnceLock<Mutex<Enigo>> = OnceLock::new();
 fn get_enigo() -> &'static Mutex<Enigo> {
     ENIGO_INSTANCE.get_or_init(|| {
         tracing::info!("initializing enigo keyboard singleton");
-        let enigo = Enigo::new(&Settings::default())
-            .expect("failed to initialize enigo");
+        let enigo = Enigo::new(&Settings::default()).expect("failed to initialize enigo");
         Mutex::new(enigo)
     })
 }
@@ -28,11 +27,16 @@ fn get_enigo() -> &'static Mutex<Enigo> {
 ///
 /// Returns error if keyboard simulation fails or mutex is poisoned.
 pub fn type_text(text: &str, delay_ms: u64, append_enter: bool) -> Result<()> {
-    tracing::info!("typing text: {} chars, delay={}ms, enter={}", text.len(), delay_ms, append_enter);
-    
+    tracing::info!(
+        "typing text: {} chars, delay={}ms, enter={}",
+        text.len(),
+        delay_ms,
+        append_enter
+    );
+
     // Small delay to ensure target window is ready
     thread::sleep(Duration::from_millis(50));
-    
+
     let mut enigo = get_enigo()
         .lock()
         .map_err(|_| anyhow::anyhow!("enigo mutex poisoned"))?;
@@ -53,9 +57,7 @@ pub fn type_text(text: &str, delay_ms: u64, append_enter: bool) -> Result<()> {
         }
     }
 
-    if append_enter
-        && let Err(e) = enigo.key(enigo::Key::Return, enigo::Direction::Click)
-    {
+    if append_enter && let Err(e) = enigo.key(enigo::Key::Return, enigo::Direction::Click) {
         tracing::error!("failed to press Enter: {}", e);
         return Err(e).context("failed to press Enter");
     }

@@ -18,7 +18,10 @@ impl I18n {
 
     /// Translate a key. Falls back to the raw key if missing.
     pub fn t(&self, key: &str) -> String {
-        self.map.get(key).cloned().unwrap_or_else(|| key.to_string())
+        self.map
+            .get(key)
+            .cloned()
+            .unwrap_or_else(|| key.to_string())
     }
 }
 

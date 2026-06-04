@@ -9,11 +9,10 @@ use anyhow::Result;
 pub fn is_enabled() -> Result<bool> {
     use anyhow::Context;
     use auto_launch::AutoLaunch;
-    
+
     let app_name = "nfc-wedge";
-    let app_path = std::env::current_exe()
-        .context("failed to get current exe path")?;
-    
+    let app_path = std::env::current_exe().context("failed to get current exe path")?;
+
     let auto = AutoLaunch::new(app_name, app_path.to_str().unwrap(), &[] as &[&str]);
     auto.is_enabled()
         .context("failed to check auto-start status")
@@ -28,14 +27,12 @@ pub fn is_enabled() -> Result<bool> {
 pub fn enable() -> Result<()> {
     use anyhow::Context;
     use auto_launch::AutoLaunch;
-    
+
     let app_name = "nfc-wedge";
-    let app_path = std::env::current_exe()
-        .context("failed to get current exe path")?;
-    
+    let app_path = std::env::current_exe().context("failed to get current exe path")?;
+
     let auto = AutoLaunch::new(app_name, app_path.to_str().unwrap(), &[] as &[&str]);
-    auto.enable()
-        .context("failed to enable auto-start")
+    auto.enable().context("failed to enable auto-start")
 }
 
 /// Disables auto-start.
@@ -47,14 +44,12 @@ pub fn enable() -> Result<()> {
 pub fn disable() -> Result<()> {
     use anyhow::Context;
     use auto_launch::AutoLaunch;
-    
+
     let app_name = "nfc-wedge";
-    let app_path = std::env::current_exe()
-        .context("failed to get current exe path")?;
-    
+    let app_path = std::env::current_exe().context("failed to get current exe path")?;
+
     let auto = AutoLaunch::new(app_name, app_path.to_str().unwrap(), &[] as &[&str]);
-    auto.disable()
-        .context("failed to disable auto-start")
+    auto.disable().context("failed to disable auto-start")
 }
 
 // macOS stubs - do nothing

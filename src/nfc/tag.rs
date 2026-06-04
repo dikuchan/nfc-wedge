@@ -1,5 +1,5 @@
-use pcsc::Card;
 use anyhow::{Result, anyhow};
+use pcsc::Card;
 
 use super::apdu;
 
@@ -53,9 +53,9 @@ pub fn read_tag(card: &Card) -> Result<Vec<u8>> {
     // Find NDEF Message TLV (0x03)
     if let Some(pos) = data.iter().position(|&b| b == 0x03) {
         tracing::debug!("NDEF TLV header found at offset {pos}");
-        let (_, ndef_data) = parse_tlv(&data[pos..])
-            .map_err(|e| anyhow!("TLV parse failed: {e}"))?;
-        
+        let (_, ndef_data) =
+            parse_tlv(&data[pos..]).map_err(|e| anyhow!("TLV parse failed: {e}"))?;
+
         tracing::info!("extracted {} bytes of NDEF content", ndef_data.len());
         return Ok(ndef_data.to_vec());
     }
@@ -98,7 +98,8 @@ fn parse_tlv(data: &[u8]) -> Result<(usize, &[u8]), &'static str> {
 /// Returns error if the reader does not support UID retrieval or transmission fails.
 pub fn get_uid(card: &Card) -> Result<Vec<u8>> {
     let mut recv = [0u8; 32];
-    let rsp = card.transmit(&GET_UID_APDU, &mut recv)
+    let rsp = card
+        .transmit(&GET_UID_APDU, &mut recv)
         .map_err(|e| anyhow!("failed to get UID: {e}"))?;
 
     if !apdu::is_success(rsp) {
